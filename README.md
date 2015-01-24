@@ -11,6 +11,8 @@ Python Implementation of Hungarian Algorithm
 ```python
 from hungarian import Hungarian
 
-hg = Hungarian()
-assignment, total_cost = hg.execute(cost_matrix)
+N = 10  # problem size
+cost_matrix = np.random.random((N, N))
+h = Hungarian(N)
+assignment, total_cost = h.execute(cost_matrix)
 ```

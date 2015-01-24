@@ -13,6 +13,11 @@ In this implementation, we use workers and jobs to stand for the two vertices
 sets in the bipartite graph and deal with the minimum-cost matching problem. It
 is easy to transform the minimum problem to the maximum one, just by setting
 cost(x, y) = M - cost(x, y), where M = max cost(x, y).
+
+Reference:
+http://community.topcoder.com/tc?module=Static&d1=tutorials&d2=hungarianAlgorith
+http://www.cse.ust.hk/~golin/COMP572/Notes/Matching.pdf
+https://github.com/KevinStern/software-and-algorithms-cpp
 """
 
 
@@ -22,12 +27,8 @@ from numba import jit
 
 class Hungarian:
 
-    def __init__(self):
-        pass
-
-    def execute(self, cost_matrix):
-        self.cost = np.copy(cost_matrix)
-        self.N = cost_matrix.shape[0]
+    def __init__(self, N):
+        self.N = N
 
         # labels for jobs and workers
         self.job_labels = np.empty(self.N, dtype='float64')
@@ -50,6 +51,15 @@ class Hungarian:
         self.slack = np.empty(self.N, dtype='float64')
         self.slack_worker = np.empty(self.N, dtype='int32')
 
+    def execute(self, cost_matrix):
+        m, n = cost_matrix.shape
+        msg = ('cost_matrix should be square matrix of size (%d, %d)'
+               % (self.N, self.N))
+        assert m == self.N, msg
+        assert n == self.N, msg
+
+        self.cost = np.copy(cost_matrix)
+
         self.reduce()
         self.initialize_labels()
         self.greedy_match()
@@ -60,10 +70,11 @@ class Hungarian:
             self.execute_phase()
             worker = self.fetch_free_worker()
 
-        path = np.array([(w, j) for w, j in enumerate(self.matched_workers)])
-        total_cost = cost_matrix[path[:, 0], path[:, 1]].sum()
+        assignment = np.array([(w, j) for
+                               w, j in enumerate(self.matched_workers)])
+        total_cost = cost_matrix[assignment[:, 0], assignment[:, 1]].sum()
 
-        return total_cost, path
+        return total_cost, assignment
 
     def reduce(self):
         """
@@ -132,20 +143,13 @@ class Hungarian:
         by adding it for all committed workers and by subtracting it for all
         committed jobs. Besides, update the slack values appropriately.
         """
-        N = self.N
-        for w in range(N):
-            if self.committed_workers[w]:
-                # increase the label of worker which is comimtted(in S)
-                self.worker_labels[w] += delta
-
-        for j in range(N):
-            if self.committed_jobs[j]:
-                # decrease the label of job which is committed(in T)
-                self.job_labels[j] -= delta
-            else:
-                # decrease the slack of free job whose
-                # corresponding worker's label which has been increased
-                self.slack[j] -= delta
+        # increase the label of worker which is comimtted(in S)
+        self.worker_labels[self.committed_workers] += delta
+        # decrease the label of job which is committed(in T)
+        self.job_labels[self.committed_jobs] -= delta
+        # decrease the slack of free job whose
+        # corresponding worker's label which has been increased
+        self.slack[np.logical_not(self.committed_jobs)] -= delta
 
     def execute_phase(self):
         """
